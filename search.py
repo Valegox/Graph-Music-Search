@@ -1,5 +1,6 @@
 import pickle
 import streamlit as st
+from rapidfuzz import fuzz
 
 types_color = {
     "artist": "#1f78b4",
@@ -8,41 +9,51 @@ types_color = {
     "label": "#e31a1c",
 }
 
-def renderEntityItem(id, label, type):
-    color = types_color[type]
-    badge = f"<span style='background-color:{color};color:white;padding:2px 6px;border-radius:6px;font-size:0.8em;margin-right:6px'>{type.capitalize()}</span>"
-    url = f"?id={id}"
-    st.markdown(f"{badge}<a href='{url}' style='text-decoration:none;font-weight:bold'>{label}</a>", unsafe_allow_html=True)
+def renderTypeBadge(type):
+    return f"<span style='background-color:{types_color[type]};color:white;padding:2px 6px;border-radius:6px;font-size:0.8em;margin-right:6px'>{type.capitalize()}</span>"
 
+def renderEntityItem(id, label, type):
+    badge = renderTypeBadge(type)
+    url = f"?id={id}"
+    st.markdown(f"{badge}<a href='{url}' target='_self' style='text-decoration:none;font-weight:bold'>{label}</a>", unsafe_allow_html=True)
+
+def renderGraphPage():
+    total_nodes = G.number_of_nodes()
+    with open("graph.html", "rb") as f:
+        graph_html = f.read().decode("utf-8")
+        st.write(f"{total_nodes} entities")
+        st.components.v1.html(graph_html, height=600, scrolling=True)
+                
 def renderQueryPage():
     query = st.text_input("Enter your search query here (artist, song, album, label):")
-    total_nodes = G.number_of_nodes()
-    st.write(f"Total entities in the graph: {total_nodes}")
     if query:
-        results = []
+        results = {}
         for node in G.nodes(data=True):
-            if query.lower() in node[1]['label'].lower():
-                print(node)
-                results.append(node)
+            id = node[0]
+            label = node[1]['label']
+            score = fuzz.partial_ratio(query.lower(), label.lower())
+            if score > 80:
+                results[id] = score
         if not results:
             st.write(f"No results found for '{query}'...")
         else:
             st.write("Results :")
-            for r in results:
-                renderEntityItem(r[0], r[1]['label'], r[1]['type'])
+            result_list = list(results.keys())
+            result_list.sort(key=lambda x: results[x], reverse=True)
+            for n_id in result_list:
+                n = G.nodes.get(n_id)
+                renderEntityItem(n_id, n['label'], n['type'])
 
 def renderEntityPage(entity_id):
     node = G.nodes.get(entity_id)
     if node:
         st.header(f"{node['type'].capitalize()} Details")
-        st.write(f"**Label:** {node['label']}")
-        st.write(f"**Type:** {node['type']}")
-        st.write(f"**ID:** {entity_id}")
-        # calculate centrality in the graph
-        centrality = G.degree(entity_id)
-        st.write(f"**Centrality:** {centrality}")
-        st.link_button("Back to search", "/")
-        # add all related nodes
+        st.write(f"<u>Name:</u> {node['label']}", unsafe_allow_html=True)
+        st.write(f"<u>Type:</u> {renderTypeBadge(node['type'])}", unsafe_allow_html=True)
+        st.write(f"<u>ID:</u> *{entity_id}*", unsafe_allow_html=True)
+        st.write(f"<u>{G.degree(entity_id)} direct relationships</u>", unsafe_allow_html=True)
+        st.markdown("<a href='/' target='_self' style='text-decoration:none'><- Back to Search</a>", unsafe_allow_html=True)
+        # Add all related nodes
         st.subheader("Related Entities")
         related_nodes = list(G.neighbors(entity_id))
         if related_nodes:
@@ -65,7 +76,11 @@ if __name__ == "__main__":
     st.title("Music Search")
     params = st.query_params
     selected_id = params.get("id", None)
-    if selected_id:
-        renderEntityPage(selected_id)
+    if selected_id == "graph":
+        renderGraphPage()
     else:
-        renderQueryPage()
+        st.link_button(f"Open Graph ({G.number_of_nodes()} entities)", "?id=graph")
+        if selected_id:
+            renderEntityPage(selected_id)
+        else:
+            renderQueryPage()
