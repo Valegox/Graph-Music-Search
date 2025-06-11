@@ -15,7 +15,14 @@ def renderTypeBadge(type):
 def renderEntityItem(id, label, type):
     badge = renderTypeBadge(type)
     url = f"?id={id}"
-    st.markdown(f"{badge}<a href='{url}' target='_self' style='text-decoration:none;font-weight:bold'>{label}</a>", unsafe_allow_html=True)
+    st.markdown(f"{badge}<a href='{url}' target='_self' style='font-size:1.3em;text-decoration:none;font-weight:bold'>{label}</a>", unsafe_allow_html=True)
+    related = list(G.neighbors(id))
+    # List related nodes
+    if related:
+        related_labels = [G.nodes.get(r_id, {}).get('label', '') for r_id in related]
+        related_links = [f"<a href='?id={r_id}' style='color:gray'>{label}</a>" for r_id, label in zip(related, related_labels)]
+        related_str = ", ".join(related_links)
+        st.markdown(f"<span style='font-size:em;color:gray'>{related_str}</span>", unsafe_allow_html=True)
 
 def renderGraphPage():
     total_nodes = G.number_of_nodes()
@@ -27,19 +34,19 @@ def renderGraphPage():
 def renderQueryPage():
     query = st.text_input("Enter your search query here (artist, song, album, label):")
     if query:
-        results = {}
+        result_scores = {}
         for node in G.nodes(data=True):
             id = node[0]
             label = node[1]['label']
             score = fuzz.partial_ratio(query.lower(), label.lower())
             if score > 80:
-                results[id] = score
-        if not results:
+                result_scores[id] = score
+        if not result_scores:
             st.write(f"No results found for '{query}'...")
         else:
-            st.write("Results :")
-            result_list = list(results.keys())
-            result_list.sort(key=lambda x: results[x], reverse=True)
+            result_list = list(result_scores.keys())
+            result_list.sort(key=lambda x: result_scores[x], reverse=True)
+            st.write(f"{len(result_list)} results :")
             for n_id in result_list:
                 n = G.nodes.get(n_id)
                 renderEntityItem(n_id, n['label'], n['type'])
