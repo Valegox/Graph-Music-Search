@@ -79,8 +79,8 @@ if __name__ == "__main__":
     except FileNotFoundError:
         print("Graph file not found. Please make sure 'graph.pkl' exists in the current directory.")
         exit(1)
-    st.set_page_config(page_title="Music Search", layout="wide")
-    st.title("Music Search")
+    st.set_page_config(page_title="MusicGraph", layout="wide")
+    st.title("MusicGraph")
     params = st.query_params
     selected_id = params.get("id", None)
     if selected_id == "graph":
